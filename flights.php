@@ -1,18 +1,19 @@
 <?php
+// Start the session and include necessary files
+session_start();
 include 'includes/db_connect.php';
-include 'includes/header.php';
 
 // Handle Delete
 if (isset($_POST['delete'])) {
     $stmt = $pdo->prepare("DELETE FROM schedules WHERE flight_id = ?");
     $stmt->execute([$_POST['flight_id']]);
-    header("Location: index.php");
+    $_SESSION['message'] = 'Flight schedule deleted successfully.';
+    header("Location: flights.php");
     exit();
 }
 
 // Handle Add/Edit
 if (isset($_POST['submit'])) {
-    echo "<!-- Debug: Handling form submission -->\n";
     try {
         $pdo->beginTransaction();
         
@@ -21,44 +22,42 @@ if (isset($_POST['submit'])) {
         
         if (isset($_POST['schedule_id'])) {
             // Update
-            $stmt = $pdo->prepare("
-                UPDATE schedules 
-                SET flight_id = ?, 
-                    departure_time = ?, 
-                    arrival_time = ? 
-                WHERE schedule_id = ?
-            ");
-            $stmt->execute([
-                $_POST['flight_id'], 
-                $departure_time, 
-                $arrival_time, 
-                $_POST['schedule_id']
-            ]);
+            $stmt = $pdo->prepare("UPDATE schedules SET flight_id = ?, departure_time = ?, arrival_time = ? WHERE schedule_id = ?");
+            $stmt->execute([$_POST['flight_id'], $departure_time, $arrival_time, $_POST['schedule_id']]);
+            $_SESSION['message'] = 'Flight schedule updated successfully.';
         } else {
-            // Insert - Get the next schedule_id
+            // Insert
             $next_id = $pdo->query("SELECT MAX(schedule_id) + 1 FROM schedules")->fetchColumn();
-            $next_id = $next_id ?: 1; // If null (empty table), start with 1
+            $next_id = $next_id ?: 1;
             
-            $stmt = $pdo->prepare("
-                INSERT INTO schedules 
-                (schedule_id, flight_id, departure_time, arrival_time) 
-                VALUES (?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $next_id,
-                $_POST['flight_id'], 
-                $departure_time, 
-                $arrival_time
-            ]);
+            $stmt = $pdo->prepare("INSERT INTO schedules (schedule_id, flight_id, departure_time, arrival_time) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$next_id, $_POST['flight_id'], $departure_time, $arrival_time]);
+            $_SESSION['message'] = 'Flight schedule added successfully.';
         }
         
         $pdo->commit();
-        header("Location: index.php");
+        header("Location: flights.php");
         exit();
     } catch (Exception $e) {
         $pdo->rollBack();
-        echo "Error: " . $e->getMessage();
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: flights.php");
+        exit();
     }
+}
+
+// Include header after all redirects
+include 'includes/header.php';
+
+// Display messages if any
+if (isset($_SESSION['message'])) {
+    echo '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['message'] . '</div>';
+    unset($_SESSION['message']);
+}
+
+if (isset($_SESSION['error'])) {
+    echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['error'] . '</div>';
+    unset($_SESSION['error']);
 }
 
 // Get schedule for editing if ID is provided

@@ -1,28 +1,65 @@
 <?php
+session_start();
 include 'includes/db_connect.php';
-include 'includes/header.php';
 
 // Handle Delete
 if (isset($_POST['delete'])) {
-    $stmt = $pdo->prepare("DELETE FROM airports WHERE airport_id = ?");
-    $stmt->execute([$_POST['airport_id']]);
-    header("Location: airports.php");
-    exit();
+    try {
+        $stmt = $pdo->prepare("DELETE FROM airports WHERE airport_id = ?");
+        $stmt->execute([$_POST['airport_id']]);
+        $_SESSION['message'] = 'Airport deleted successfully.';
+        header("Location: airports.php");
+        exit();
+    } catch (Exception $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: airports.php");
+        exit();
+    }
 }
 
 // Handle Add/Edit
 if (isset($_POST['submit'])) {
-    if (isset($_POST['airport_id'])) {
-        // Update
-        $stmt = $pdo->prepare("UPDATE airports SET code = ?, name = ?, city = ?, country = ? WHERE airport_id = ?");
-        $stmt->execute([$_POST['code'], $_POST['name'], $_POST['city'], $_POST['country'], $_POST['airport_id']]);
-    } else {
-        // Insert
-        $stmt = $pdo->prepare("INSERT INTO airports (code, name, city, country) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$_POST['code'], $_POST['name'], $_POST['city'], $_POST['country']]);
+    try {
+        $pdo->beginTransaction();
+        
+        if (isset($_POST['airport_id'])) {
+            // Update
+            $stmt = $pdo->prepare("UPDATE airports SET code = ?, name = ?, city = ?, country = ? WHERE airport_id = ?");
+            $stmt->execute([$_POST['code'], $_POST['name'], $_POST['city'], $_POST['country'], $_POST['airport_id']]);
+            $_SESSION['message'] = 'Airport updated successfully.';
+        } else {
+            // Insert
+            $next_id = $pdo->query("SELECT MAX(airport_id) + 1 FROM airports")->fetchColumn();
+            $next_id = $next_id ?: 1;
+            
+            $stmt = $pdo->prepare("INSERT INTO airports (airport_id, code, name, city, country) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$next_id, $_POST['code'], $_POST['name'], $_POST['city'], $_POST['country']]);
+            $_SESSION['message'] = 'Airport added successfully.';
+        }
+        
+        $pdo->commit();
+        header("Location: airports.php");
+        exit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: airports.php");
+        exit();
     }
-    header("Location: airports.php");
-    exit();
+}
+
+// Include header after all redirects
+include 'includes/header.php';
+
+// Display messages if any
+if (isset($_SESSION['message'])) {
+    echo '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['message'] . '</div>';
+    unset($_SESSION['message']);
+}
+
+if (isset($_SESSION['error'])) {
+    echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['error'] . '</div>';
+    unset($_SESSION['error']);
 }
 
 // Get airport for editing if ID is provided

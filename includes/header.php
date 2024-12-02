@@ -3,9 +3,17 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$is_admin = ($_SESSION['role'] === 'Administrator');
-$is_supplier = ($_SESSION['role'] === 'Supplier');
-$is_doctor = ($_SESSION['role'] === 'Doctor');
+// Set default values for role checks
+$is_admin = false;
+$is_supplier = false;
+$is_doctor = false;
+
+// Only check roles if session exists
+if (isset($_SESSION['role'])) {
+    $is_admin = ($_SESSION['role'] === 'Administrator');
+    $is_supplier = ($_SESSION['role'] === 'Supplier');
+    $is_doctor = ($_SESSION['role'] === 'Doctor');
+}
 ?>
 
 <!DOCTYPE html>
@@ -26,7 +34,7 @@ $is_doctor = ($_SESSION['role'] === 'Doctor');
                 <div class="flex items-center space-x-8">
                     <a href="index.php" class="flex items-center py-4 px-2">
                         <i class="fas fa-plane text-2xl mr-3 transform -rotate-45"></i>
-                        <span class="font-bold text-xl">AirlineMS</span>
+                        <span class="font-bold text-xl">Aeronix</span>
                     </a>
                     
                     <!-- Main Navigation -->

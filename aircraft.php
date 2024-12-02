@@ -1,28 +1,65 @@
 <?php
+session_start();
 include 'includes/db_connect.php';
-include 'includes/header.php';
 
 // Handle Delete
 if (isset($_POST['delete'])) {
-    $stmt = $pdo->prepare("DELETE FROM aircraft WHERE aircraft_id = ?");
-    $stmt->execute([$_POST['aircraft_id']]);
-    header("Location: aircraft.php");
-    exit();
+    try {
+        $stmt = $pdo->prepare("DELETE FROM aircraft WHERE aircraft_id = ?");
+        $stmt->execute([$_POST['aircraft_id']]);
+        $_SESSION['message'] = 'Aircraft deleted successfully.';
+        header("Location: aircraft.php");
+        exit();
+    } catch (Exception $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: aircraft.php");
+        exit();
+    }
 }
 
 // Handle Add/Edit
 if (isset($_POST['submit'])) {
-    if (isset($_POST['aircraft_id'])) {
-        // Update
-        $stmt = $pdo->prepare("UPDATE aircraft SET model = ?, capacity = ?, flight_range = ? WHERE aircraft_id = ?");
-        $stmt->execute([$_POST['model'], $_POST['capacity'], $_POST['flight_range'], $_POST['aircraft_id']]);
-    } else {
-        // Insert
-        $stmt = $pdo->prepare("INSERT INTO aircraft (model, capacity, flight_range) VALUES (?, ?, ?)");
-        $stmt->execute([$_POST['model'], $_POST['capacity'], $_POST['flight_range']]);
+    try {
+        $pdo->beginTransaction();
+        
+        if (isset($_POST['aircraft_id'])) {
+            // Update
+            $stmt = $pdo->prepare("UPDATE aircraft SET model = ?, capacity = ?, flight_range = ? WHERE aircraft_id = ?");
+            $stmt->execute([$_POST['model'], $_POST['capacity'], $_POST['flight_range'], $_POST['aircraft_id']]);
+            $_SESSION['message'] = 'Aircraft updated successfully.';
+        } else {
+            // Insert
+            $next_id = $pdo->query("SELECT MAX(aircraft_id) + 1 FROM aircraft")->fetchColumn();
+            $next_id = $next_id ?: 1;
+            
+            $stmt = $pdo->prepare("INSERT INTO aircraft (aircraft_id, model, capacity, flight_range) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$next_id, $_POST['model'], $_POST['capacity'], $_POST['flight_range']]);
+            $_SESSION['message'] = 'Aircraft added successfully.';
+        }
+        
+        $pdo->commit();
+        header("Location: aircraft.php");
+        exit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: aircraft.php");
+        exit();
     }
-    header("Location: aircraft.php");
-    exit();
+}
+
+// Include header after all redirects
+include 'includes/header.php';
+
+// Display messages if any
+if (isset($_SESSION['message'])) {
+    echo '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['message'] . '</div>';
+    unset($_SESSION['message']);
+}
+
+if (isset($_SESSION['error'])) {
+    echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['error'] . '</div>';
+    unset($_SESSION['error']);
 }
 
 // Get aircraft for editing if ID is provided

@@ -1074,8 +1074,8 @@ INSERT INTO `routes` (`route_id`, `departure_airport_id`, `arrival_airport_id`, 
 CREATE TABLE `schedules` (
   `schedule_id` int(11) NOT NULL,
   `flight_id` int(11) NOT NULL,
-  `departure_time` timestamp NOT NULL,
-  `arrival_time` timestamp NOT NULL
+  `departure_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `arrival_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

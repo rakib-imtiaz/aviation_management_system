@@ -1,32 +1,65 @@
 <?php
+session_start();
 include 'includes/db_connect.php';
-include 'includes/header.php';
 
 // Handle Delete
 if (isset($_POST['delete'])) {
-    $stmt = $pdo->prepare("DELETE FROM bookings WHERE booking_id = ?");
-    $stmt->execute([$_POST['booking_id']]);
-    header("Location: bookings.php");
-    exit();
+    try {
+        $stmt = $pdo->prepare("DELETE FROM bookings WHERE booking_id = ?");
+        $stmt->execute([$_POST['booking_id']]);
+        $_SESSION['message'] = 'Booking deleted successfully.';
+        header("Location: bookings.php");
+        exit();
+    } catch (Exception $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: bookings.php");
+        exit();
+    }
 }
 
 // Handle Add/Edit
 if (isset($_POST['submit'])) {
     try {
+        $pdo->beginTransaction();
+        
         if (isset($_POST['booking_id'])) {
             // Update
             $stmt = $pdo->prepare("UPDATE bookings SET flight_id = ?, passenger_id = ?, seat_number = ? WHERE booking_id = ?");
             $stmt->execute([$_POST['flight_id'], $_POST['passenger_id'], $_POST['seat_number'], $_POST['booking_id']]);
+            $_SESSION['message'] = 'Booking updated successfully.';
         } else {
             // Insert
-            $stmt = $pdo->prepare("INSERT INTO bookings (flight_id, passenger_id, seat_number) VALUES (?, ?, ?)");
-            $stmt->execute([$_POST['flight_id'], $_POST['passenger_id'], $_POST['seat_number']]);
+            $next_id = $pdo->query("SELECT MAX(booking_id) + 1 FROM bookings")->fetchColumn();
+            $next_id = $next_id ?: 1;
+            
+            $stmt = $pdo->prepare("INSERT INTO bookings (booking_id, flight_id, passenger_id, seat_number) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$next_id, $_POST['flight_id'], $_POST['passenger_id'], $_POST['seat_number']]);
+            $_SESSION['message'] = 'Booking added successfully.';
         }
+        
+        $pdo->commit();
         header("Location: bookings.php");
         exit();
     } catch (Exception $e) {
-        echo "Error: " . $e->getMessage();
+        $pdo->rollBack();
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: bookings.php");
+        exit();
     }
+}
+
+// Include header after all redirects
+include 'includes/header.php';
+
+// Display messages if any
+if (isset($_SESSION['message'])) {
+    echo '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['message'] . '</div>';
+    unset($_SESSION['message']);
+}
+
+if (isset($_SESSION['error'])) {
+    echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['error'] . '</div>';
+    unset($_SESSION['error']);
 }
 
 // Get booking for editing if ID is provided

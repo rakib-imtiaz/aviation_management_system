@@ -1,32 +1,65 @@
 <?php
+session_start();
 include 'includes/db_connect.php';
-include 'includes/header.php';
 
 // Handle Delete
 if (isset($_POST['delete'])) {
-    $stmt = $pdo->prepare("DELETE FROM routes WHERE route_id = ?");
-    $stmt->execute([$_POST['route_id']]);
-    header("Location: routes.php");
-    exit();
+    try {
+        $stmt = $pdo->prepare("DELETE FROM routes WHERE route_id = ?");
+        $stmt->execute([$_POST['route_id']]);
+        $_SESSION['message'] = 'Route deleted successfully.';
+        header("Location: routes.php");
+        exit();
+    } catch (Exception $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: routes.php");
+        exit();
+    }
 }
 
 // Handle Add/Edit
 if (isset($_POST['submit'])) {
     try {
+        $pdo->beginTransaction();
+        
         if (isset($_POST['route_id'])) {
             // Update
             $stmt = $pdo->prepare("UPDATE routes SET departure_airport_id = ?, arrival_airport_id = ?, distance = ? WHERE route_id = ?");
             $stmt->execute([$_POST['departure_airport_id'], $_POST['arrival_airport_id'], $_POST['distance'], $_POST['route_id']]);
+            $_SESSION['message'] = 'Route updated successfully.';
         } else {
             // Insert
-            $stmt = $pdo->prepare("INSERT INTO routes (departure_airport_id, arrival_airport_id, distance) VALUES (?, ?, ?)");
-            $stmt->execute([$_POST['departure_airport_id'], $_POST['arrival_airport_id'], $_POST['distance']]);
+            $next_id = $pdo->query("SELECT MAX(route_id) + 1 FROM routes")->fetchColumn();
+            $next_id = $next_id ?: 1;
+            
+            $stmt = $pdo->prepare("INSERT INTO routes (route_id, departure_airport_id, arrival_airport_id, distance) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$next_id, $_POST['departure_airport_id'], $_POST['arrival_airport_id'], $_POST['distance']]);
+            $_SESSION['message'] = 'Route added successfully.';
         }
+        
+        $pdo->commit();
         header("Location: routes.php");
         exit();
     } catch (Exception $e) {
-        echo "Error: " . $e->getMessage();
+        $pdo->rollBack();
+        $_SESSION['error'] = "Error: " . $e->getMessage();
+        header("Location: routes.php");
+        exit();
     }
+}
+
+// Include header after all redirects
+include 'includes/header.php';
+
+// Display messages if any
+if (isset($_SESSION['message'])) {
+    echo '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['message'] . '</div>';
+    unset($_SESSION['message']);
+}
+
+if (isset($_SESSION['error'])) {
+    echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">' . $_SESSION['error'] . '</div>';
+    unset($_SESSION['error']);
 }
 
 // Get route for editing if ID is provided
@@ -110,7 +143,7 @@ $routes = $stmt->fetchAll();
             </button>
             
             <?php if ($editing): ?>
-                <a href="routes.php" 
+                <a href="index.php" 
                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Cancel
                 </a>
